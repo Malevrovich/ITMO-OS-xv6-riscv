@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "error.h"
 
 struct cpu cpus[NCPU];
 
@@ -692,5 +693,47 @@ dump(void)
     printf("s%d = %d\n", i+2, *(start + i));
   }
 
+  return 0;
+}
+
+int
+dump2(int pid, int register_num, uint64 *return_value)
+{
+  struct proc *pp;
+  struct proc *my_proc  = myproc();
+
+  if (register_num < 2 || register_num > 11) {
+    return DUMP2_EINVREG;
+  }
+
+  acquire(&wait_lock);
+  for(pp = proc; pp < &proc[NPROC]; pp++){
+    acquire(&pp->lock);
+    if(pp->pid == pid){
+      goto found_p;
+    } else {
+      release(&pp->lock);
+    }
+  }
+
+  release(&wait_lock);
+  return DUMP2_ENOPROC;
+
+found_p:
+  if (my_proc != pp && pp->parent != my_proc) {   
+    release(&pp->lock);
+    release(&wait_lock);
+    return DUMP2_ENOACCESS;
+  }
+
+  release(&pp->lock);
+  release(&wait_lock);
+
+  char *reg_addr = (char*)(&pp->trapframe->s2 + (register_num - 2));
+  
+  if(copyout(my_proc->pagetable, (uint64)return_value, (char *)reg_addr, 8) < 0) {
+    return DUMP2_ENOWRITE;
+  }
+  
   return 0;
 }

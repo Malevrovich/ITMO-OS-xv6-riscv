@@ -105,6 +105,11 @@ $U/_dumptests: $U/dumptests.c $U/dumptests.S $(ULIB)
 	$(CC) $(CFLAGS) -c -o $U/dumptests.o $U/dumptests.c
 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_dumptests $U/dumptests.o $U/dumptests_asm.o $(ULIB)
 
+$U/_dump2tests: $U/dump2tests.c $U/dump2tests.S $(ULIB)
+	$(CC) $(CFLAGS) -c -o $U/dumptests_asm2.o $U/dump2tests.S
+	$(CC) $(CFLAGS) -c -o $U/dump2tests.o $U/dump2tests.c
+	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_dump2tests $U/dump2tests.o $U/dumptests_asm2.o $(ULIB)
+
 $U/_forktest: $U/forktest.o $(ULIB)
 	# forktest has less library code linked in - needs to be small
 	# in order to be able to max out the proc table.
@@ -123,6 +128,7 @@ mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 UPROGS=\
 	$U/_cat\
 	$U/_dumptests\
+	$U/_dump2tests\
 	$U/_echo\
 	$U/_forktest\
 	$U/_grep\
