@@ -699,7 +699,7 @@ dump(void)
 int
 dump2(int pid, int register_num, uint64 *return_value)
 {
-  struct proc *pp;
+  struct proc *p;
   struct proc *my_proc  = myproc();
 
   if (register_num < 2 || register_num > 11) {
@@ -707,33 +707,30 @@ dump2(int pid, int register_num, uint64 *return_value)
   }
 
   acquire(&wait_lock);
-  for(pp = proc; pp < &proc[NPROC]; pp++){
-    acquire(&pp->lock);
-    if(pp->pid == pid){
-      goto found_p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->pid == pid){
+      if (my_proc != p && p->parent != my_proc) {   
+        release(&p->lock);
+        release(&wait_lock);
+        return DUMP2_ENOACCESS;
+      }
+
+      release(&p->lock);
+      release(&wait_lock);
+
+      char *reg_addr = (char*)(&p->trapframe->s2 + (register_num - 2));
+
+      if(copyout(my_proc->pagetable, (uint64)return_value, (char *)reg_addr, 8) < 0) {
+        return DUMP2_ENOWRITE;
+      }
+
+      return 0;
     } else {
-      release(&pp->lock);
+      release(&p->lock);
     }
   }
 
   release(&wait_lock);
   return DUMP2_ENOPROC;
-
-found_p:
-  if (my_proc != pp && pp->parent != my_proc) {   
-    release(&pp->lock);
-    release(&wait_lock);
-    return DUMP2_ENOACCESS;
-  }
-
-  release(&pp->lock);
-  release(&wait_lock);
-
-  char *reg_addr = (char*)(&pp->trapframe->s2 + (register_num - 2));
-  
-  if(copyout(my_proc->pagetable, (uint64)return_value, (char *)reg_addr, 8) < 0) {
-    return DUMP2_ENOWRITE;
-  }
-  
-  return 0;
 }
