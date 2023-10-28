@@ -8,10 +8,8 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
-struct list {
-    struct list* next;
-    struct list* prev;
-};
+struct list;
+struct sync_list;
 
 // bio.c
 void            binit(void);
@@ -197,10 +195,28 @@ void *lst_pop(struct list*);
 void lst_print(struct list*);
 int lst_empty(struct list*);
 
+// sync_list.c
+void s_lst_init(struct sync_list*);
+void s_lst_remove(struct sync_list*, struct sync_list*);
+void s_lst_push(struct sync_list*, struct sync_list *);
+void s_lst_release_element(struct sync_list*, struct sync_list *);
+void s_lst_move_next(struct sync_list *, struct sync_list **);
+int s_lst_empty(struct sync_list*);
+struct sync_list *s_lst_next(struct sync_list *e);
+
 // buddy.c
 void *bd_malloc(uint64 nbytes);
 void bd_free(void *p);
 void bd_init(void *base, void *end);
+void bd_print();
+
+#define CHECK(statement)                                                  \
+  do {                                                                    \
+    if (!(statement)) {                                                   \
+      printf("Statement failed at %s:%d\n", __FILE__, __LINE__);          \
+      panic("Assert failed");                                             \
+    }                                                                     \
+  } while (0)
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

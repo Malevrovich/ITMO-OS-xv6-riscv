@@ -93,6 +93,8 @@ consoleread(int user_dst, uint64 dst, int n)
         release(&cons.lock);
         return -1;
       }
+      CHECK(mycpu()->noff >= 1);
+      CHECK(mycpu()->noff <= 1);
       sleep(&cons.r, &cons.lock);
     }
 

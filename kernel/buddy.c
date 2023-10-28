@@ -2,6 +2,7 @@
 #include "param.h"
 #include "memlayout.h"
 #include "spinlock.h"
+#include "list.h"
 #include "riscv.h"
 #include "defs.h"
 
@@ -16,6 +17,8 @@ static int nsizes;  // the number of entries in bd_sizes array
 #define NBLK(k) (1 << (MAXSIZE - k))  // Number of block at size k
 #define ROUNDUP(n, sz) \
   (((((n)-1) / (sz)) + 1) * (sz))  // Round up to the next multiple of sz
+
+#define CHECK_IN_RAM(p) CHECK((uint64)p > KERNBASE && (uint64)p < PHYSTOP)
 
 typedef struct list Bd_list;
 
@@ -38,6 +41,7 @@ static struct spinlock lock;
 
 // Return 1 if bit at position index in array is set to 1
 int bit_isset(char *array, int index) {
+  CHECK_IN_RAM(array);
   char b = array[index / 8];
   char m = (1 << (index % 8));
   return (b & m) == m;
@@ -45,6 +49,7 @@ int bit_isset(char *array, int index) {
 
 // Set bit at position index in array to 1
 void bit_set(char *array, int index) {
+  CHECK_IN_RAM(array);
   char b = array[index / 8];
   char m = (1 << (index % 8));
   array[index / 8] = (b | m);
@@ -52,6 +57,7 @@ void bit_set(char *array, int index) {
 
 // Clear bit at position index in array
 void bit_clear(char *array, int index) {
+  CHECK_IN_RAM(array);
   char b = array[index / 8];
   char m = (1 << (index % 8));
   array[index / 8] = (b & ~m);
@@ -67,6 +73,7 @@ void bit_invert(char *array, int index) {
 // Print a bit vector as a list of ranges of 1 bits
 void bd_print_vector(char *vector, int len) {
   int last, lb;
+  CHECK_IN_RAM(vector);
 
   last = 1;
   lb = 0;
@@ -143,12 +150,15 @@ void *bd_malloc(uint64 nbytes) {
     // split a block at size k and mark one half allocated at size k-1
     // and put the buddy on the free list at size k-1
     char *q = p + BLK_SIZE(k - 1);  // p's buddy
+    CHECK_IN_RAM(q);
+    CHECK_IN_RAM(bd_sizes[k].split);
     bit_set(bd_sizes[k].split, blk_index(k, p));
     bit_invert(bd_sizes[k - 1].alloc, blk_index(k - 1, p) / 2);
     lst_push(&bd_sizes[k - 1].free, q);
   }
   release(&lock);
 
+  // printf("Allocated %p\n", p);
   return p;
 }
 
@@ -167,6 +177,7 @@ int size(char *p) {
 void bd_free(void *p) {
   void *q;
   int k;
+  CHECK_IN_RAM(p);
 
   acquire(&lock);
   for (k = size(p); k < MAXSIZE; k++) {
@@ -178,14 +189,17 @@ void bd_free(void *p) {
     // buddy is free; merge with buddy
     int buddy = (bi % 2 == 0) ? bi + 1 : bi - 1;
     q = addr(k, buddy);
+    CHECK_IN_RAM(q);
     lst_remove(q);  // remove buddy from free list
     if (buddy % 2 == 0) {
       p = q;
     }
     // at size k+1, mark that the merged buddy pair isn't split
     // anymore
+    CHECK_IN_RAM(bd_sizes[k + 1].split);
     bit_clear(bd_sizes[k + 1].split, blk_index(k + 1, p));
   }
+  CHECK_IN_RAM(p);
   lst_push(&bd_sizes[k].free, p);
   release(&lock);
 }
@@ -294,6 +308,7 @@ void bd_init(void *base, void *end) {
 
   initlock(&lock, "buddy");
   bd_base = (void *)p;
+  acquire(&lock);
 
   // compute the number of sizes we need to manage [base, end)
   nsizes = log2(((char *)end - p) / LEAF_SIZE) + 1;
@@ -340,6 +355,7 @@ void bd_init(void *base, void *end) {
 
   // initialize free lists for each size k
   int free = bd_initfree(p, bd_end);
+  release(&lock);
 
   // check if the amount that is free is what we expect
   if (free != BLK_SIZE(MAXSIZE) - meta - unavailable) {

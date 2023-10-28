@@ -1,7 +1,7 @@
 #include "types.h"
 #include "param.h"
 #include "memlayout.h"
-#include "spinlock.h"
+#include "list.h"
 #include "riscv.h"
 #include "defs.h"
 
@@ -54,4 +54,3 @@ lst_print(struct list *lst)
   }
   printf("\n");
 }
-

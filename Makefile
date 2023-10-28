@@ -30,6 +30,7 @@ OBJS = \
   $K/plic.o \
   $K/virtio_disk.o \
   $K/list.o \
+  $K/sync_list.o \
   $K/buddy.o 
 
 # riscv64-unknown-elf- or riscv64-linux-gnu-
