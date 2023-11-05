@@ -349,6 +349,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((npte = walk(new, i, 1)) == 0)
       panic("uvmcopy: npte failed");
     *npte = *pte;
+    *npte &= ~PTE_W;
   }
   return 0;
 }
