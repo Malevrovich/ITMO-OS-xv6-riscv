@@ -155,7 +155,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
       return -1;
     if(*pte & PTE_V)
       panic("mappages: remap");
-    *pte = PA2PTE(pa) | perm | PTE_V;
+    *pte = (PA2PTE(pa) | perm | PTE_V) & ~PTE_L;
     if(a == last)
       break;
     a += PGSIZE;
@@ -346,11 +346,54 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
-    if((npte = walk(new, i, 1)) == 0)
-      panic("uvmcopy: npte failed");
+    if ((*pte & PTE_W) != 0) {
+      *pte |= PTE_L;
+    }
+    *pte &= ~PTE_W;
+    kdup((void*)PTE2PA(*pte));
+
+    npte = walk(new, i, 1);
+    if (npte == 0) {
+      uvmunmap(new, 0, i / PGSIZE, 1);
+      return -1;
+    }
     *npte = *pte;
-    *npte &= ~PTE_W;
   }
+  return 0;
+}
+
+int
+uvmcow(pagetable_t pagetable, uint64 va)
+{
+  pagetable_t pte;
+
+  if (va >= MAXVA) {
+    return -1;
+  }
+
+  if((pte = walk(pagetable, va, 1)) == 0) {
+    return -1;
+  }
+  if((*pte & PTE_V) == 0 || (*pte & PTE_L) == 0) {
+    return -1;
+  }
+
+  if (krefcnt((void*)PTE2PA((uint64)*pte)) == 1) {
+    *pte |= PTE_W;
+    return 0;
+  }
+
+  void *mem = kalloc();
+  if(mem == 0) {
+    return -1;
+  }
+
+  memmove(mem, (void*)PTE2PA((uint64)*pte), PGSIZE);
+  
+  kfree((void*)PTE2PA((uint64)*pte));
+
+  *pte = PA2PTE(mem) | PTE_FLAGS((uint64)*pte) | PTE_W;
+
   return 0;
 }
 
@@ -373,17 +416,28 @@ uvmclear(pagetable_t pagetable, uint64 va)
 int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
-  uint64 n, va0, pa0;
+  uint64 n, va0;
+  pagetable_t pte;
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
+
+    if (va0 > MAXVA) {
+      return -1;
+    }
+    pte = walk(pagetable, va0, 0);
+    if(pte == 0)
       return -1;
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
-    memmove((void *)(pa0 + (dstva - va0)), src, n);
+    
+    if ((*pte & PTE_W) == 0) {
+      if (uvmcow(pagetable, va0) != 0) {
+        return -1;
+      }
+    }
+    memmove((void *)(PTE2PA((uint64)*pte) + (dstva - va0)), src, n);
 
     len -= n;
     src += n;

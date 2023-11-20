@@ -73,9 +73,15 @@ usertrap(void)
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);  
   } else if (scause == 15) {
-    printf("usertrap(): Store/AMO page fault scause %p pid=%d\n", scause, p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    setkilled(p);  
+    // printf("usertrap(): Store/AMO page fault scause %p pid=%d\n", scause, p->pid);
+    // printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    // setkilled(p);  
+    if(uvmcow(p->pagetable, r_stval()) != 0) {
+      // printf("usertrap(): Store/AMO page fault scause %p pid=%d\n", scause, p->pid);
+      // printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      // printf("Unable to copy page\n");
+      setkilled(p);
+    }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", scause, p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());

@@ -8,6 +8,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct atomic_uint;
 
 // bio.c
 void            binit(void);
@@ -63,6 +64,8 @@ void            ramdiskrw(struct buf*);
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
+void            kdup(void *);
+unsigned int    krefcnt(void*);
 
 // log.c
 void            initlog(int, struct superblock*);
@@ -165,6 +168,7 @@ void            uvmfirst(pagetable_t, uchar *, uint);
 uint64          uvmalloc(pagetable_t, uint64, uint64, int);
 uint64          uvmdealloc(pagetable_t, uint64, uint64);
 int             uvmcopy(pagetable_t, pagetable_t, uint64);
+int             uvmcow(pagetable_t, uint64);
 void            uvmfree(pagetable_t, uint64);
 void            uvmunmap(pagetable_t, uint64, uint64, int);
 void            uvmclear(pagetable_t, uint64);
@@ -185,6 +189,12 @@ void            plic_complete(int);
 void            virtio_disk_init(void);
 void            virtio_disk_rw(struct buf *, int);
 void            virtio_disk_intr(void);
+
+// atomic.c
+void            atomic_uint_init(struct atomic_uint *x, unsigned int val);
+unsigned int    atomic_uint_fetch(struct atomic_uint *x);
+void            atomic_uint_increment(struct atomic_uint *x);
+unsigned int    atomic_uint_decrement_and_fetch(struct atomic_uint *x);
 
 
 // number of elements in fixed-size array
