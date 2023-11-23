@@ -288,6 +288,7 @@ fork(void)
     return -1;
   }
 
+  // vmprint(p->pagetable);
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
@@ -295,6 +296,7 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+  // vmprint(np->pagetable);
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
@@ -412,6 +414,7 @@ wait(uint64 addr)
                                   sizeof(pp->xstate)) < 0) {
             release(&pp->lock);
             release(&wait_lock);
+            printf("wait failed because no mem\n");
             return -1;
           }
           freeproc(pp);

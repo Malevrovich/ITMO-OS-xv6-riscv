@@ -2023,6 +2023,7 @@ sbrkbasic(char *s)
     exit(1);
   }
 
+  xstatus = 1;
   wait(&xstatus);
   if(xstatus == 1){
     printf("%s: too much memory allocated!\n", s);
@@ -2229,6 +2230,7 @@ sbrkfail(char *s)
     printf("%s: allocate a lot of memory succeeded %d\n", s, n);
     exit(1);
   }
+  xstatus = -1;
   wait(&xstatus);
   if(xstatus != -1 && xstatus != 2)
     exit(1);

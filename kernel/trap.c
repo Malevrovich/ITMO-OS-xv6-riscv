@@ -38,6 +38,7 @@ usertrap(void)
 {
   int which_dev = 0;
   int scause = r_scause();
+  uint64 stval = r_stval();
 
   if((r_sstatus() & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
@@ -69,22 +70,22 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else if (scause == 13) {
-    printf("usertrap(): load page fault scause %p pid=%d\n", scause, p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    setkilled(p);  
+    if (uvmrealalloc(p->pagetable, stval) != 0) {
+      printf("usertrap(): load page fault scause %p pid=%d\n", scause, p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), stval);
+      setkilled(p);  
+    }
   } else if (scause == 15) {
-    // printf("usertrap(): Store/AMO page fault scause %p pid=%d\n", scause, p->pid);
-    // printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    // setkilled(p);  
-    if(uvmcow(p->pagetable, r_stval()) != 0) {
-      // printf("usertrap(): Store/AMO page fault scause %p pid=%d\n", scause, p->pid);
-      // printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-      // printf("Unable to copy page\n");
-      setkilled(p);
+    if (uvmrealalloc(p->pagetable, stval) != 0) {
+      if(uvmcow(p->pagetable, stval) != 0) {
+        printf("usertrap(): Store/AMO page fault scause %p pid=%d\n", scause, p->pid);
+        printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+        setkilled(p);
+      }
     }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", scause, p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    printf("            sepc=%p stval=%p\n", r_sepc(), stval);
     setkilled(p);
   }
 
